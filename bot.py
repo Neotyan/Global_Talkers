@@ -295,7 +295,6 @@ async def s_edit_final(call: CallbackQuery, state: FSMContext):
 async def handle_ping(request):
     return web.Response(text="Бот работает, не спать!")
 
-# === ЗАПУСК ===
 async def main():
     if not ADMIN_CHAT_ID:
         print("ВНИМАНИЕ: Не найден ADMIN_CHAT_ID! Проверь файл .env")
@@ -303,18 +302,30 @@ async def main():
         
     bot = Bot(token=TOKEN)
     print("Бот Global Talkers запущен...")
+    
+    # 1. Запускаем Телеграм-бота параллельным процессом, чтобы он не тормозил обманку
+    import asyncio
+    asyncio.create_task(dp.start_polling(bot))
+    
+    # 2. Включаем веб-обманку
     app = web.Application()
     app.router.add_get('/', handle_ping)
     
     runner = web.AppRunner(app)
     await runner.setup()
     
-    port = int(os.environ.get('PORT', 8080))
+    port = int(os.environ.get('PORT', 10000))
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
 
-    print(f"Обманка запущена на порту {port}, включаем бота...")
-    await dp.start_polling(bot)
+    print(f"Сервер-обманка запущен на порту {port}...")
+    
+    # 3. Держим программу включенной бесконечно
+    await asyncio.Event().wait()
+
+if __name__ == '__main__':
+    import asyncio
+    asyncio.run(main())
 
 if __name__ == "__main__":
     import asyncio
