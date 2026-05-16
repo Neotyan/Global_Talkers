@@ -1,6 +1,7 @@
 import asyncio
 from os import getenv
 from dotenv import load_dotenv
+from aiohttp import web
 
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -288,6 +289,8 @@ async def s_edit_final(call: CallbackQuery, state: FSMContext):
     await call.message.answer("Без проблем, давай начнем сначала.\n\n1. Как к тебе обращаться?")
     await state.set_state(StudentForm.name)
 
+async def handle_ping(request):
+    return web.Response(text="Бот работает, не спать!")
 
 # === ЗАПУСК ===
 async def main():
@@ -297,7 +300,17 @@ async def main():
         
     bot = Bot(token=TOKEN)
     print("Бот Global Talkers запущен...")
+    app = web.Application()
+    app.router.add_get('/', handle_ping)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+
+    print("Обманка запущена, включаем бота...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
+    import asyncio
     asyncio.run(main())
