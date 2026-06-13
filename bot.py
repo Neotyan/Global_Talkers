@@ -26,7 +26,6 @@ class TeacherForm(StatesGroup):
     experience = State()
     motivation = State()
     hours = State()
-    media = State()
     confirm = State() # Шаг проверки
 
 class StudentForm(StatesGroup):
@@ -125,19 +124,12 @@ async def t_hours(message: Message, state: FSMContext):
     await message.answer("7. Сколько часов в неделю ты сможешь стабильно уделять ученикам? (Лучше написать меньше, но честно, чтобы мы могли нормально составить график).")
     await state.set_state(TeacherForm.hours)
 
+# Показываем превью анкеты Волонтёра
 @router.message(TeacherForm.hours)
-async def t_media(message: Message, state: FSMContext):
-    await state.update_data(hours=message.text)
-    await message.answer("8. Покажи себя в деле: Запиши кружочек или голосовое сообщение на 1 минуту на английском и скинь его сюда. Расскажи немного о себе и своих увлечениях. (Так мы поймем, что ты хочешь участвовать, и будем знать твой разговорный уровень, несмотря на акцент).")
-    await state.set_state(TeacherForm.media)
-
-# Ловим кружочек и показываем превью анкеты
-@router.message(TeacherForm.media, F.voice | F.video_note)
 async def t_preview(message: Message, state: FSMContext):
-    # Запоминаем ID сообщения с медиа
-    await state.update_data(media_msg_id=message.message_id)
+    await state.update_data(hours=message.text)
     data = await state.get_data()
-    
+
     text = (
         f"Твоя анкета готова! Проверь, всё ли верно:\n\n"
         f"<b>Имя:</b> {data['name']}\n"
@@ -146,21 +138,16 @@ async def t_preview(message: Message, state: FSMContext):
         f"<b>Пруфы:</b> {data['proof']}\n"
         f"<b>Опыт:</b> {data['experience']}\n"
         f"<b>Мотивация:</b> {data['motivation']}\n"
-        f"<b>Часы в неделю:</b> {data['hours']}\n\n"
-        f"<i>(Твое голосовое/видео тоже сохранено)</i>"
+        f"<b>Часы в неделю:</b> {data['hours']}"
     )
-    
+
     markup = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Всё верно, отправить", callback_data="t_send")],
         [InlineKeyboardButton(text="🔄 Заполнить заново", callback_data="t_edit")]
     ])
-    
+
     await message.answer(text, reply_markup=markup, parse_mode="HTML")
     await state.set_state(TeacherForm.confirm)
-
-@router.message(TeacherForm.media)
-async def t_media_wrong(message: Message):
-    await message.answer("Это не голосовое и не видеокружок. Пожалуйста, запиши аудио или видео!")
 
 # Кнопки финальной проверки Волонтёра
 @router.callback_query(TeacherForm.confirm, F.data == "t_send")
@@ -182,20 +169,14 @@ async def t_send_final(call: CallbackQuery, state: FSMContext, bot: Bot):
     )
     
     # Отправляем в админку
-    sent_media = await bot.copy_message(
-        chat_id=ADMIN_CHAT_ID, 
-        from_chat_id=call.message.chat.id, 
-        message_id=data['media_msg_id']
-    )
     sent_text = await bot.send_message(
-        chat_id=ADMIN_CHAT_ID, 
-        text=text, 
-        parse_mode="HTML",
-        reply_to_message_id=sent_media.message_id
+        chat_id=ADMIN_CHAT_ID,
+        text=text,
+        parse_mode="HTML"
     )
     await bot.pin_chat_message(chat_id=ADMIN_CHAT_ID, message_id=sent_text.message_id, disable_notification=True)
-    
-    await call.message.answer("Супер! Анкета и твоя запись отправлены админам. Обязательно проверь, чтобы у тебя были открыты личные сообщения, иначе мы не сможем тебе написать. Скоро свяжемся!")
+
+    await call.message.answer("Супер! Анкета отправлена админам. Обязательно проверь, чтобы у тебя были открыты личные сообщения, иначе мы не сможем тебе написать. Скоро свяжемся!")
     await state.clear()
 
 @router.callback_query(TeacherForm.confirm, F.data == "t_edit")
